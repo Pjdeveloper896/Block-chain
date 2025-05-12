@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Secure Blockchain</title>
+
+  <!-- Spider CSS -->
+  <link rel="stylesheet" href="node_modules/shopisticate-css/Spider.css/dist/Spider.css" />
+  <script src="node_modules/shopisticate-css/Spider.css/dist/Spider.js"></script>
+
+  <style>
+    .block {
+      background: #222;
+      color: #fff;
+      padding: 1rem;
+      margin: 10px auto;
+      border-radius: 10px;
+      box-shadow: 0 0 10px #00000070;
+      max-width: 90%;
+      word-wrap: break-word;
+    }
+    .hash { font-size: 0.75rem; color: #ccc; }
+    #blockchain { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+    button { margin-top: 20px; }
+  </style>
+</head>
+<body class="p2">
+
+  <div id="blockchain-container" class="card bg-primary p2 shadow">
+    <h2 class="center white">🔐 Secure Blockchain (Crypto API)</h2>
+    <div id="blockchain"></div>
+    <button onclick="addBlock()" class="btn-primary shadow rounded p-1" spy="fade shadow rounded m1">➕ Add Block</button>
+    <button onclick="checkValidity()" class="btn-secondary shadow rounded p-1 m1">✅ Validate Chain</button>
+    <p id="status" class="center bold white mt2"></p>
+  </div>
+
+  <script>
+    class Block {
+      constructor(index, previousHash, timestamp, data, hash) {
+        this.index = index;
+        this.previousHash = previousHash;
+        this.timestamp = timestamp;
+        this.data = data;
+        this.hash = hash;
+      }
+    }
+
+    let blockchain = [];
+    let currentIndex = 0;
+
+    // Use Web Crypto API for secure hashing
+    async function generateHash(index, previousHash, timestamp, data) {
+      const encoder = new TextEncoder();
+      const input = `${index}${previousHash}${timestamp}${JSON.stringify(data)}`;
+      const dataBuffer = encoder.encode(input);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function createGenesisBlock() {
+      const timestamp = Date.now();
+      const hash = await generateHash(0, "0", timestamp, "Genesis Block");
+      return new Block(0, "0", timestamp, "Genesis Block", hash);
+    }
+
+    async function addBlock() {
+      const previousBlock = blockchain[blockchain.length - 1] || await createGenesisBlock();
+      const timestamp = Date.now();
+      const data = `Block #${currentIndex + 1}`;
+      const hash = await generateHash(currentIndex + 1, previousBlock.hash, timestamp, data);
+      const newBlock = new Block(currentIndex + 1, previousBlock.hash, timestamp, data, hash);
+      blockchain.push(newBlock);
+      currentIndex++;
+      displayBlockchain();
+    }
+
+    function displayBlockchain() {
+      const container = document.getElementById("blockchain");
+      container.innerHTML = '';
+      blockchain.forEach(block => {
+        const blockDiv = document.createElement("div");
+        blockDiv.className = "block";
+        blockDiv.innerHTML = `
+          <strong>Block #${block.index}</strong><br/>
+          <div class="hash">Prev Hash: ${block.previousHash}</div>
+          <div class="hash">Hash: ${block.hash}</div>
+          <div>Data: ${block.data}</div>
+          <div><small>${new Date(block.timestamp).toLocaleString()}</small></div>
+        `;
+        container.appendChild(blockDiv);
+      });
+    }
+
+    async function checkValidity() {
+      const status = document.getElementById("status");
+      for (let i = 1; i < blockchain.length; i++) {
+        const curr = blockchain[i];
+        const prev = blockchain[i - 1];
+        const validHash = await generateHash(curr.index, curr.previousHash, curr.timestamp, curr.data);
+        if (curr.hash !== validHash || curr.previousHash !== prev.hash) {
+          status.innerText = "❌ Blockchain is INVALID!";
+          status.classList.add("text-danger");
+          return;
+        }
+      }
+      status.innerText = "✅ Blockchain is VALID!";
+      status.classList.remove("text-danger");
+    }
+
+    // Initialize blockchain
+    (async () => {
+      const genesis = await createGenesisBlock();
+      blockchain.push(genesis);
+      displayBlockchain();
+    })();
+  </script>
+</body>
+</html>
